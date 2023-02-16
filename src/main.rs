@@ -1,11 +1,11 @@
-use rand::Rng;
-use rust_gpu_tools::{cuda, opencl, program_closures, Device, GPUError, Program};
+use rust_gpu_tools::{cuda, program_closures, Device, GPUError, Program};
 use snarkvm::{create_scalar_bases, prelude::TestRng, Fr, G1Affine};
 
 // use crate::test_data::rand::TestRng;
 
 pub mod test_data;
 pub use snarkvm;
+pub mod opencl;
 
 /// Returns a `Program` that runs on CUDA.
 // fn cuda(device: &Device) -> Program {
@@ -18,12 +18,12 @@ pub use snarkvm;
 // }
 
 /// Returns a `Program` that runs on OpenCL.
-fn opencl(device: &Device) -> Program {
-    let opencl_kernel = include_str!("./add.cl");
-    let opencl_device = device.opencl_device().unwrap();
-    let opencl_program = opencl::Program::from_opencl(opencl_device, opencl_kernel).unwrap();
-    Program::Opencl(opencl_program)
-}
+// fn opencl(device: &Device) -> Program {
+//     let opencl_kernel = include_str!("./add.cl");
+//     let opencl_device = device.opencl_device().unwrap();
+//     let opencl_program = opencl::Program::from_opencl(opencl_device, opencl_kernel).unwrap();
+//     Program::Opencl(opencl_program)
+// }
 
 pub fn main() {
     let mut rng = TestRng::default();
@@ -31,9 +31,11 @@ pub fn main() {
     let (bases, scalars) = create_scalar_bases::<G1Affine, Fr>(&mut rng, test_size);
 
     let cpu = snarkvm::cpu::msm(bases.as_slice(), scalars.as_slice());
-    let cuda = snarkvm::cuda::msm_cuda(bases.as_slice(), scalars.as_slice()).unwrap();
+    // let cuda = snarkvm::cuda::msm_cuda(bases.as_slice(), scalars.as_slice()).unwrap();
 
-    assert_eq!(cpu, cuda);
+    let opencl = opencl::msm_opencl(bases.as_slice(), scalars.as_slice()).unwrap();
+
+    assert_eq!(cpu, opencl);
     dbg!("success");
 
     // This is the core. Here we write the interaction with the GPU independent of whether it is
