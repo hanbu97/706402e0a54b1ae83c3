@@ -7,6 +7,8 @@ use snarkvm::{
 };
 use snarkvm::{initialize_cuda_request_handler, prelude::*};
 
+pub mod program;
+
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
@@ -18,45 +20,56 @@ lazy_static::lazy_static! {
     };
 }
 
+lazy_static::lazy_static! {
+    static ref OPENCL_DISPATCH: crossbeam_channel::Sender<CudaRequest> = {
+        let (sender, receiver) = crossbeam_channel::bounded(4096);
+        std::thread::spawn(move || initialize_opencl_request_handler(receiver));
+        sender
+    };
+}
+
 const SCALAR_BITS: usize = 253;
 const BIT_WIDTH: usize = 1;
 const LIMB_COUNT: usize = 6;
 const WINDOW_SIZE: u32 = 128; // must match in cuda source
 
-// pub struct OpenclRequest {
-//     bases: Vec<G1Affine>,
-//     scalars: Vec<Fr>,
-//     response: crossbeam_channel::Sender<Result<G1Projective, GPUError>>,
-// }
+pub struct OpenclRequest {
+    bases: Vec<G1Affine>,
+    scalars: Vec<Fr>,
+    response: crossbeam_channel::Sender<Result<G1Projective, GPUError>>,
+}
+
 /// Initialize the cuda request handler.
-// fn initialize_opencl_request_handler(input: crossbeam_channel::Receiver<CudaRequest>) {
-//     match load_cuda_program() {
-//         Ok(program) => {
-//             let num_groups = (SCALAR_BITS + BIT_WIDTH - 1) / BIT_WIDTH;
+fn initialize_opencl_request_handler(input: crossbeam_channel::Receiver<CudaRequest>) {
+    todo!();
 
-//             let mut context = CudaContext {
-//                 num_groups: num_groups as u32,
-//                 pixel_func_name: "msm6_pixel".to_string(),
-//                 row_func_name: "msm6_collapse_rows".to_string(),
-//                 program,
-//             };
+    // match load_cuda_program() {
+    //     Ok(program) => {
+    //         let num_groups = (SCALAR_BITS + BIT_WIDTH - 1) / BIT_WIDTH;
 
-//             // Handle each cuda request received from the channel.
-//             while let Ok(request) = input.recv() {
-//                 let out = handle_cuda_request(&mut context, &request);
+    //         let mut context = CudaContext {
+    //             num_groups: num_groups as u32,
+    //             pixel_func_name: "msm6_pixel".to_string(),
+    //             row_func_name: "msm6_collapse_rows".to_string(),
+    //             program,
+    //         };
 
-//                 request.response.send(out).ok();
-//             }
-//         }
-//         Err(err) => {
-//             eprintln!("Error loading cuda program: {:?}", err);
-//             // If the cuda program fails to load, notify the cuda request dispatcher.
-//             while let Ok(request) = input.recv() {
-//                 request.response.send(Err(GPUError::DeviceNotFound)).ok();
-//             }
-//         }
-//     }
-// }
+    //         // Handle each cuda request received from the channel.
+    //         while let Ok(request) = input.recv() {
+    //             let out = handle_cuda_request(&mut context, &request);
+
+    //             request.response.send(out).ok();
+    //         }
+    //     }
+    //     Err(err) => {
+    //         eprintln!("Error loading cuda program: {:?}", err);
+    //         // If the cuda program fails to load, notify the cuda request dispatcher.
+    //         while let Ok(request) = input.recv() {
+    //             request.response.send(Err(GPUError::DeviceNotFound)).ok();
+    //         }
+    //     }
+    // }
+}
 
 #[allow(clippy::transmute_undefined_repr)]
 pub fn msm_opencl<G: AffineCurve>(
