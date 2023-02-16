@@ -43,7 +43,6 @@ pub fn handle_opencl_request(
         let window_lengths_buffer = program.create_buffer_from_slice(&window_lengths)?;
         let base_buffer = program.create_buffer_from_slice(&mapped_bases)?;
         let scalars_buffer = program.create_buffer_from_slice(&request.scalars)?;
-
         let buckets_buffer = program.create_buffer_from_slice(&vec![
             0u8;
             context.num_groups as usize
@@ -61,6 +60,7 @@ pub fn handle_opencl_request(
                     as usize
                 * 3
         ])?;
+        //////////////////////////////////////////////////////////////////////////////////////////////////
 
         // // The global work size follows CUDA's definition and is the number of
         // // `LOCAL_WORK_SIZE` sized thread groups.
