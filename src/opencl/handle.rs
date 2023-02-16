@@ -68,6 +68,7 @@ pub fn handle_opencl_request(
         // let global_work_size =
         //     (window_lengths.len() * context.num_groups as usize + LOCAL_WORK_SIZE - 1) / LOCAL_WORK_SIZE;
 
+        // 8888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
         let kernel_1 = program.create_kernel(
             &context.pixel_func_name,
             window_lengths.len(),
@@ -81,7 +82,7 @@ pub fn handle_opencl_request(
             .arg(&window_lengths_buffer)
             .arg(&(window_lengths.len() as u32))
             .run()?;
-
+        // 8888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
         let kernel_2 =
             program.create_kernel(&context.row_func_name, 1, context.num_groups as usize)?;
 
@@ -90,9 +91,10 @@ pub fn handle_opencl_request(
             .arg(&buckets_buffer)
             .arg(&(window_lengths.len() as u32))
             .run()?;
-
+        // 8888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
         let mut results = vec![0u8; LIMB_COUNT as usize * 8 * context.num_groups as usize * 3];
         program.read_into_buffer(&result_buffer, &mut results)?;
+        //////////////////////////////////////////////////////////////////////////////////////////////////
 
         Ok(results)
     });
