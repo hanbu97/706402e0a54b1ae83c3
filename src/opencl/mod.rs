@@ -1,27 +1,23 @@
 use std::any::TypeId;
 
 use rust_gpu_tools::GPUError;
-use snarkvm::cuda::CudaRequest;
+use rust_gpu_tools::Program;
+use snarkvm::prelude::*;
 use snarkvm::{
     circuit::PrimeField, prelude::AffineCurve, BitIteratorBE, Fr, G1Affine, G1Projective,
 };
-use snarkvm::{initialize_cuda_request_handler, prelude::*};
 
+pub mod handle;
 pub mod program;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-lazy_static::lazy_static! {
-    static ref CUDA_DISPATCH: crossbeam_channel::Sender<CudaRequest> = {
-        let (sender, receiver) = crossbeam_channel::bounded(4096);
-        std::thread::spawn(move || initialize_cuda_request_handler(receiver));
-        sender
-    };
-}
+use self::handle::handle_opencl_request;
+use self::program::load_opencl_program;
 
 lazy_static::lazy_static! {
-    static ref OPENCL_DISPATCH: crossbeam_channel::Sender<CudaRequest> = {
+    static ref OPENCL_DISPATCH: crossbeam_channel::Sender<OpenclRequest> = {
         let (sender, receiver) = crossbeam_channel::bounded(4096);
         std::thread::spawn(move || initialize_opencl_request_handler(receiver));
         sender
@@ -31,7 +27,7 @@ lazy_static::lazy_static! {
 const SCALAR_BITS: usize = 253;
 const BIT_WIDTH: usize = 1;
 const LIMB_COUNT: usize = 6;
-const WINDOW_SIZE: u32 = 128; // must match in cuda source
+const WINDOW_SIZE: u32 = 128; // must match in opencl source
 
 pub struct OpenclRequest {
     bases: Vec<G1Affine>,
@@ -39,36 +35,43 @@ pub struct OpenclRequest {
     response: crossbeam_channel::Sender<Result<G1Projective, GPUError>>,
 }
 
-/// Initialize the cuda request handler.
-fn initialize_opencl_request_handler(input: crossbeam_channel::Receiver<CudaRequest>) {
-    todo!();
+pub struct OpenclContext {
+    num_groups: u32,
+    pixel_func_name: String,
+    row_func_name: String,
+    program: Program,
+}
 
-    // match load_cuda_program() {
-    //     Ok(program) => {
-    //         let num_groups = (SCALAR_BITS + BIT_WIDTH - 1) / BIT_WIDTH;
+/// Initialize the opencl request handler.
+fn initialize_opencl_request_handler(input: crossbeam_channel::Receiver<OpenclRequest>) {
+    // todo!();
 
-    //         let mut context = CudaContext {
-    //             num_groups: num_groups as u32,
-    //             pixel_func_name: "msm6_pixel".to_string(),
-    //             row_func_name: "msm6_collapse_rows".to_string(),
-    //             program,
-    //         };
+    match load_opencl_program() {
+        Ok(program) => {
+            let num_groups = (SCALAR_BITS + BIT_WIDTH - 1) / BIT_WIDTH;
 
-    //         // Handle each cuda request received from the channel.
-    //         while let Ok(request) = input.recv() {
-    //             let out = handle_cuda_request(&mut context, &request);
+            let mut context = OpenclContext {
+                num_groups: num_groups as u32,
+                pixel_func_name: "msm6_pixel".to_string(),
+                row_func_name: "msm6_collapse_rows".to_string(),
+                program,
+            };
 
-    //             request.response.send(out).ok();
-    //         }
-    //     }
-    //     Err(err) => {
-    //         eprintln!("Error loading cuda program: {:?}", err);
-    //         // If the cuda program fails to load, notify the cuda request dispatcher.
-    //         while let Ok(request) = input.recv() {
-    //             request.response.send(Err(GPUError::DeviceNotFound)).ok();
-    //         }
-    //     }
-    // }
+            // Handle each opencl request received from the channel.
+            while let Ok(request) = input.recv() {
+                let out = handle_opencl_request(&mut context, &request);
+
+                request.response.send(out).ok();
+            }
+        }
+        Err(err) => {
+            eprintln!("Error loading opencl program: {:?}", err);
+            // If the opencl program fails to load, notify the opencl request dispatcher.
+            while let Ok(request) = input.recv() {
+                request.response.send(Err(GPUError::DeviceNotFound)).ok();
+            }
+        }
+    }
 }
 
 #[allow(clippy::transmute_undefined_repr)]
@@ -77,7 +80,7 @@ pub fn msm_opencl<G: AffineCurve>(
     mut scalars: &[<G::ScalarField as PrimeField>::BigInteger],
 ) -> Result<G::Projective, GPUError> {
     if TypeId::of::<G>() != TypeId::of::<G1Affine>() {
-        unimplemented!("trying to use cuda for unsupported curve");
+        unimplemented!("trying to use opencl for unsupported curve");
     }
 
     match bases.len() < scalars.len() {
@@ -95,8 +98,8 @@ pub fn msm_opencl<G: AffineCurve>(
     }
 
     let (sender, receiver) = crossbeam_channel::bounded(1);
-    CUDA_DISPATCH
-        .send(CudaRequest {
+    OPENCL_DISPATCH
+        .send(OpenclRequest {
             bases: unsafe { std::mem::transmute(bases.to_vec()) },
             scalars: unsafe { std::mem::transmute(scalars.to_vec()) },
             response: sender,

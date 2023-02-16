@@ -1,7 +1,7 @@
 use rust_gpu_tools::{Device, GPUError, Program};
 
 /// Loads the msm.fatbin into an executable CUDA program.
-fn load_opencl_program() -> Result<Program, GPUError> {
+pub fn load_opencl_program() -> Result<Program, GPUError> {
     let devices: Vec<_> = Device::all();
     let device = match devices.first() {
         Some(device) => device,
