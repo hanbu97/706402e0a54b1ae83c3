@@ -20,7 +20,7 @@ pub fn load_opencl_program() -> Result<Program, GPUError> {
     );
 
     // let opencl_kernel = std::fs::read(file_path.clone())?;
-    let opencl_kernel = include_str!("./add.cl");
+    let opencl_kernel = include_str!("./msm.cl");
 
     // Load the cuda program from the kernel bytes.
     let cuda_program =
@@ -34,4 +34,19 @@ pub fn load_opencl_program() -> Result<Program, GPUError> {
         };
 
     Ok(Program::Opencl(cuda_program))
+}
+
+#[test]
+fn test_load_opencl_program() {
+    if let Err(e) = load_opencl_program() {
+        dbg!(e);
+    };
+}
+
+#[test]
+fn u64_from_hex_str() {
+    let hex_string = "0x8508bfffffffffff";
+    let hex_string = hex_string.strip_prefix("0x").unwrap_or(hex_string);
+    let num = u64::from_str_radix(hex_string, 16).expect("invalid hex string");
+    println!("{}", num);
 }
