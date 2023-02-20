@@ -1377,17 +1377,7 @@ KERNEL void POINT_multiexp(
   POINT_jacobian res = POINT_ZERO;
   for(uint i = nstart; i < nend; i++) {
     uint ind = EXPONENT_get_bits(exps[i], bits, w);
-
-    #if defined(OPENCL_NVIDIA) || defined(CUDA)
-      // O_o, weird optimization, having a single special case makes it
-      // tremendously faster!
-      // 511 is chosen because it's half of the maximum bucket len, but
-      // any other number works... Bigger indices seems to be better...
-      if(ind == 511) buckets[510] = POINT_add_mixed(buckets[510], bases[i]);
-      else if(ind--) buckets[ind] = POINT_add_mixed(buckets[ind], bases[i]);
-    #else
-      if(ind--) buckets[ind] = POINT_add_mixed(buckets[ind], bases[i]);
-    #endif
+    if(ind--) buckets[ind] = POINT_add_mixed(buckets[ind], bases[i]);
   }
 
   // Summation by parts

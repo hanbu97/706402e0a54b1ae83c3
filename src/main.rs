@@ -19,7 +19,7 @@ pub fn main() {
 
 #[test]
 fn u64_from_hex_str() {
-    let hex_string = "0x02cdffffffffff68";
+    let hex_string = "0x8508bfffffffffff";
     let hex_string = hex_string.strip_prefix("0x").unwrap_or(hex_string);
     let num = u64::from_str_radix(hex_string, 16).expect("invalid hex string");
     println!("{}", num);
