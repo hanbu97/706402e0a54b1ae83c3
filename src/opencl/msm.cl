@@ -514,8 +514,8 @@ DEVICE POINT_jacobian blst_p1_add_projective_to_projective(const POINT_jacobian 
   // J = H*I
   FIELD j = FIELD_mul(h,i);
 
-  // r = 2*(S2-Y1)
-  FIELD r = FIELD_sub(s2,p1.y);
+  // r = 2*(S2-S1)
+  FIELD r = FIELD_sub(s2, s1);
   r = FIELD_double(r);
 
   // V = U1*I
