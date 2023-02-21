@@ -35,7 +35,7 @@ typedef struct {
   FIELD z;
 } POINT_jacobian;
 
-#define FIELD_INV 9586122913090633727
+#define FIELD_INV 0x8508bfffffffffff
 CONSTANT FIELD FIELD_P = {{
   0x8508c00000000001, 0x170b5d4430000000,
   0x1ef3622fba094800, 0x1a22d9f300f5138f,
@@ -53,6 +53,25 @@ CONSTANT FIELD FIELD_ONE = {{
   0x9f7db3a98a7d3ff2, 0x7b4e97b76e7c6305,
   0x4cf495bf803c84e8, 0x008d6661e2fdf49a
   }};
+
+// #define FIELD_INV 9586122913090633727
+// CONSTANT FIELD FIELD_P = {{
+//   9586122913090633729, 1660523435060625408,
+//   2230234197602682880, 1883307231910630287,
+//   14284016967150029115, 121098312706494698
+//   }};
+
+// CONSTANT FIELD FIELD_R2 = {{
+//   13224372171368877346, 227991066186625457,
+//   2496666625421784173, 13825906835078366124,
+//   9475172226622360569, 30958721782860680
+//   }};
+
+// CONSTANT FIELD FIELD_ONE = {{
+//   202099033278250856, 5854854902718660529,
+//   11492539364873682930, 8885205928937022213,
+//   5545221690922665192, 39800542322357402
+//   }};
   
 CONSTANT FIELD FIELD_ZERO = { { 0, 0, 0, 0, 0, 0 } };
 CONSTANT uint WINDOW_SIZE = 128;
@@ -233,7 +252,7 @@ DEVICE POINT_jacobian blst_p1_double_affine(POINT_affine p) {
   const FIELD F = FIELD_sqr(E);
 
   // X3 = F - 2*D
-  out.x = FIELD_sub(FIELD_sub(F, D), D);
+  out.x = FIELD_sub(F, FIELD_double(D));
 
   // Y3 = E*(D - X3) - 8*C
   C = FIELD_double(C); 
@@ -417,8 +436,8 @@ DEVICE POINT_jacobian blst_p1_add_affine_to_projective(const POINT_jacobian p1, 
   // X3 = r^2 - J - 2*V
   out.x = FIELD_sqr(r);
   out.x = FIELD_sub(out.x,j);
-  out.x = FIELD_sub(out.x,v);
-  out.x = FIELD_sub(out.x,v);
+  out.x = FIELD_sub(out.x,FIELD_double(v));
+  // out.x = FIELD_sub(out.x,v);
 
   // Y3 = r*(V-X3)-2*Y1*J
   j = FIELD_mul(p1.y,j);
@@ -524,8 +543,8 @@ DEVICE POINT_jacobian blst_p1_add_projective_to_projective(const POINT_jacobian 
   // X3 = r^2 - J - 2*V
   out.x = FIELD_sqr(r);
   out.x = FIELD_sub(out.x,j);
-  out.x = FIELD_sub(out.x,v);
-  out.x = FIELD_sub(out.x,v);
+  out.x = FIELD_sub(out.x,FIELD_double(v));
+  // out.x = FIELD_sub(out.x,v);
 
   // Y3 = r*(V-X3)-2*S1*J
   j = FIELD_mul(s1,j);
