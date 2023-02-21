@@ -17,7 +17,6 @@
 #define FIELD_limb ulong
 #define FIELD_LIMBS 6
 #define FIELD_LIMB_BITS 64
-#define FIELD_INV 9586122913090633727
 typedef struct { FIELD_limb val[FIELD_LIMBS]; } FIELD;
 typedef struct { FIELD_limb val[4]; } blst_scalar;
 
@@ -36,6 +35,7 @@ typedef struct {
   FIELD z;
 } POINT_jacobian;
 
+#define FIELD_INV 9586122913090633727
 CONSTANT FIELD FIELD_P = {{
   0x8508c00000000001, 0x170b5d4430000000,
   0x1ef3622fba094800, 0x1a22d9f300f5138f,
@@ -345,7 +345,8 @@ DEVICE POINT_jacobian blst_p1_add_affines_into_projective(POINT_affine p1, POINT
 
   // X3 = r^2-J-2*V
   out.x = FIELD_sqr(r);
-  out.x = FIELD_sqr(FIELD_sub(FIELD_sub(FIELD_sub(out.x, j), v), v));
+  out.x = FIELD_sub(out.x, j);
+  out.x = FIELD_sub(out.x, FIELD_double(v));
 
   // Y3 = r*(V-X3)-2*Y1*J
   out.y = FIELD_sub(v, out.x);
@@ -436,8 +437,6 @@ DEVICE POINT_jacobian blst_p1_add_affine_to_projective(const POINT_jacobian p1, 
 }
 
 DEVICE POINT_jacobian blst_p1_add_projective_to_projective(const POINT_jacobian p1, const POINT_jacobian p2) {
-  POINT_jacobian out;
-
   if (is_blst_p1_zero(p2)) {
     return p1;
   }
@@ -446,6 +445,7 @@ DEVICE POINT_jacobian blst_p1_add_projective_to_projective(const POINT_jacobian 
     return p2;
   }
 
+  POINT_jacobian out;
   int p1_is_affine = is_blst_fp_eq(p1.z, FIELD_ONE);
   int p2_is_affine = is_blst_fp_eq(p2.z, FIELD_ONE);
 
@@ -551,7 +551,7 @@ KERNEL void msm6_pixel(GLOBAL POINT_jacobian* bucket_lists, const GLOBAL POINT_a
   uint blockIdxx = get_group_id(0);
   
   uint index = threadIdxx / 64;
-  size_t shift = get_local_id(0) - (index * 64);
+  size_t shift = threadIdxx - (index * 64);
   ulong mask = (ulong) 1 << (ulong) shift;
 
   POINT_jacobian bucket = POINT_ZERO;
@@ -559,7 +559,7 @@ KERNEL void msm6_pixel(GLOBAL POINT_jacobian* bucket_lists, const GLOBAL POINT_a
   uint window_start = WINDOW_SIZE * blockIdxx;
   uint window_end = window_start + window_lengths[blockIdxx];
 
-  LOCAL uint* activated_bases; // later input from outside
+  LOCAL uint activated_bases[128];
   uint activated_base_index = 0;
 
   uint i;
@@ -578,10 +578,11 @@ KERNEL void msm6_pixel(GLOBAL POINT_jacobian* bucket_lists, const GLOBAL POINT_a
     bucket = blst_p1_add_projective_to_projective(bucket, intermediate);
   }
   for (; i < activated_base_index; ++i) {
-      bucket = blst_p1_add_affine_to_projective(bucket, bases_in[activated_bases[i]]);
+    bucket = blst_p1_add_affine_to_projective(bucket, bases_in[activated_bases[i]]);
   }
 
   bucket_lists[threadIdxx * window_count + blockIdxx] = bucket;
+  BARRIER_LOCAL();
 }
 
 KERNEL void msm6_collapse_rows(GLOBAL POINT_jacobian* target, const GLOBAL POINT_jacobian* bucket_lists, const uint window_count) {
@@ -598,6 +599,7 @@ KERNEL void msm6_collapse_rows(GLOBAL POINT_jacobian* target, const GLOBAL POINT
   }
 
   target[threadIdxx] = temp_target;
+  BARRIER_LOCAL();
 }
 
 

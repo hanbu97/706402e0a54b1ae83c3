@@ -52,6 +52,7 @@ pub fn handle_opencl_request(
                 * LIMB_COUNT as usize
                 * 3
         ])?;
+        // let activated_bases = program.create_buffer_from_slice(&vec![0u32; 128])?;
         let result_buffer = program.create_buffer_from_slice(&vec![
             0u8;
             LIMB_COUNT as usize
@@ -60,6 +61,8 @@ pub fn handle_opencl_request(
                     as usize
                 * 3
         ])?;
+        dbg!("results", &result_buffer);
+
         //////////////////////////////////////////////////////////////////////////////////////////////////
 
         // // The global work size follows CUDA's definition and is the number of
@@ -82,18 +85,31 @@ pub fn handle_opencl_request(
             .arg(&window_lengths_buffer)
             .arg(&(window_lengths.len() as u32))
             .run()?;
-        // 8888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
+        dbg!("kernel_1");
+        //////////////////////////////////////////////////////////////////////////////////////////////////
         let kernel_2 =
             program.create_kernel(&context.row_func_name, 1, context.num_groups as usize)?;
+
+        dbg!("kernel_2");
+        let mut buckets_buffer_host =
+            vec![0u8; LIMB_COUNT as usize * 8 * context.num_groups as usize * 3];
+
+        program.read_into_buffer(&buckets_buffer, &mut buckets_buffer_host)?;
+        // dbg!(buckets_buffer_host);
+        let length = LIMB_COUNT as usize * 8 * context.num_groups as usize * 3;
+        dbg!(length);
 
         kernel_2
             .arg(&result_buffer)
             .arg(&buckets_buffer)
             .arg(&(window_lengths.len() as u32))
             .run()?;
-        // 8888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
+        //////////////////////////////////////////////////////////////////////////////////////////////////
         let mut results = vec![0u8; LIMB_COUNT as usize * 8 * context.num_groups as usize * 3];
+        dbg!("results", &result_buffer);
+
         program.read_into_buffer(&result_buffer, &mut results)?;
+        dbg!("program");
         //////////////////////////////////////////////////////////////////////////////////////////////////
 
         Ok(results)
