@@ -676,6 +676,7 @@ name = "gputest"
 version = "0.1.0"
 dependencies = [
  "crossbeam-channel",
+ "dirs",
  "lazy_static",
  "rand",
  "rand_xorshift",

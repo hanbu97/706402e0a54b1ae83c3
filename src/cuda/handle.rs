@@ -1,29 +1,40 @@
-use super::{OpenclContext, OpenclRequest, BIT_WIDTH, LIMB_COUNT, WINDOW_SIZE};
-use rayon::iter::ParallelIterator;
-use rayon::prelude::IntoParallelRefIterator;
-use rust_gpu_tools::{program_closures, GPUError};
-use snarkvm::{
-    prelude::{AffineCurve, ProjectiveCurve},
-    Fq, G1Affine, G1Projective, PrimeField, Zero,
-};
+use super::BIT_WIDTH;
+use super::{CudaContext, CudaRequest, LIMB_COUNT, WINDOW_SIZE};
+use rust_gpu_tools::program_closures;
+use rust_gpu_tools::GPUError;
+use snarkvm::prelude::ProjectiveCurve;
+use snarkvm::Zero;
+use snarkvm::{prelude::AffineCurve, Fq, G1Affine, G1Projective, PrimeField};
+
+/// Creates parallel iterator over refs if `parallel` feature is enabled.
+#[macro_export]
+macro_rules! cfg_iter {
+    ($e: expr) => {{
+        #[cfg(feature = "parallel")]
+        let result = $e.par_iter();
+
+        #[cfg(not(feature = "parallel"))]
+        let result = $e.iter();
+
+        result
+    }};
+}
 
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
 #[repr(C)]
-struct OpenclAffine {
+struct CudaAffine {
     x: Fq,
     y: Fq,
 }
 
-/// Run the OPENCL MSM operation for a given request.
-pub fn handle_opencl_request(
-    context: &mut OpenclContext,
-    request: &OpenclRequest,
+/// Run the CUDA MSM operation for a given request.
+pub fn handle_cuda_request(
+    context: &mut CudaContext,
+    request: &CudaRequest,
 ) -> Result<G1Projective, GPUError> {
-    let mapped_bases: Vec<_> = request
-        .bases
-        .par_iter()
-        .map(|affine| OpenclAffine {
+    let mapped_bases: Vec<_> = cfg_iter!(request.bases)
+        .map(|affine| CudaAffine {
             x: affine.x,
             y: affine.y,
         })
@@ -39,10 +50,10 @@ pub fn handle_opencl_request(
     }
 
     let closures = program_closures!(|program, _arg| -> Result<Vec<u8>, GPUError> {
-        //////////////////////////////////////////////////////////////////////////////////////////////////
         let window_lengths_buffer = program.create_buffer_from_slice(&window_lengths)?;
         let base_buffer = program.create_buffer_from_slice(&mapped_bases)?;
         let scalars_buffer = program.create_buffer_from_slice(&request.scalars)?;
+
         let buckets_buffer = program.create_buffer_from_slice(&vec![
             0u8;
             context.num_groups as usize
@@ -52,9 +63,6 @@ pub fn handle_opencl_request(
                 * LIMB_COUNT as usize
                 * 3
         ])?;
-        // let activated_bases = program.create_buffer_from_slice(&vec![0u32; 128])?;
-        
-        
         let result_buffer = program.create_buffer_from_slice(&vec![
             0u8;
             LIMB_COUNT as usize
@@ -63,9 +71,6 @@ pub fn handle_opencl_request(
                     as usize
                 * 3
         ])?;
-        dbg!("results", &result_buffer);
-
-        //////////////////////////////////////////////////////////////////////////////////////////////////
 
         // // The global work size follows CUDA's definition and is the number of
         // // `LOCAL_WORK_SIZE` sized thread groups.
@@ -73,7 +78,6 @@ pub fn handle_opencl_request(
         // let global_work_size =
         //     (window_lengths.len() * context.num_groups as usize + LOCAL_WORK_SIZE - 1) / LOCAL_WORK_SIZE;
 
-        // 8888888888888888888888888888888888888888888888888888888888888888888888888888888888888888
         let kernel_1 = program.create_kernel(
             &context.pixel_func_name,
             window_lengths.len(),
@@ -87,32 +91,18 @@ pub fn handle_opencl_request(
             .arg(&window_lengths_buffer)
             .arg(&(window_lengths.len() as u32))
             .run()?;
-        dbg!("kernel_1");
-        //////////////////////////////////////////////////////////////////////////////////////////////////
+
         let kernel_2 =
             program.create_kernel(&context.row_func_name, 1, context.num_groups as usize)?;
-
-        dbg!("kernel_2");
-        let mut buckets_buffer_host =
-            vec![0u8; LIMB_COUNT as usize * 8 * context.num_groups as usize * 3];
-
-        program.read_into_buffer(&buckets_buffer, &mut buckets_buffer_host)?;
-        // dbg!(buckets_buffer_host);
-        let length = LIMB_COUNT as usize * 8 * context.num_groups as usize * 3;
-        dbg!(length);
 
         kernel_2
             .arg(&result_buffer)
             .arg(&buckets_buffer)
             .arg(&(window_lengths.len() as u32))
             .run()?;
-        //////////////////////////////////////////////////////////////////////////////////////////////////
-        let mut results = vec![0u8; LIMB_COUNT as usize * 8 * context.num_groups as usize * 3];
-        dbg!("results", &result_buffer);
 
+        let mut results = vec![0u8; LIMB_COUNT as usize * 8 * context.num_groups as usize * 3];
         program.read_into_buffer(&result_buffer, &mut results)?;
-        dbg!("program");
-        //////////////////////////////////////////////////////////////////////////////////////////////////
 
         Ok(results)
     });
