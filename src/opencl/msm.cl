@@ -592,10 +592,10 @@ KERNEL void msm6_pixel(GLOBAL POINT_jacobian* bucket_lists, const GLOBAL POINT_a
   BARRIER_LOCAL();
 
   i = 0;
-  for (; i < (activated_base_index / 2 * 2); i += 2) {
-    POINT_jacobian intermediate = blst_p1_add_affines_into_projective(bases_in[activated_bases[i]], bases_in[activated_bases[i + 1]]);
-    bucket = blst_p1_add_projective_to_projective(bucket, intermediate);
-  }
+  // for (; i < (activated_base_index / 2 * 2); i += 2) {
+  //   POINT_jacobian intermediate = blst_p1_add_affines_into_projective(bases_in[activated_bases[i]], bases_in[activated_bases[i + 1]]);
+  //   bucket = blst_p1_add_projective_to_projective(bucket, intermediate);
+  // }
   for (; i < activated_base_index; ++i) {
     bucket = blst_p1_add_affine_to_projective(bucket, bases_in[activated_bases[i]]);
   }

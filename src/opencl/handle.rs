@@ -43,6 +43,14 @@ pub fn handle_opencl_request(
         let window_lengths_buffer = program.create_buffer_from_slice(&window_lengths)?;
         let base_buffer = program.create_buffer_from_slice(&mapped_bases)?;
         let scalars_buffer = program.create_buffer_from_slice(&request.scalars)?;
+
+        let buckets_length_cl = context.num_groups as usize
+            * window_lengths.len() as usize
+            * 8
+            * LIMB_COUNT as usize
+            * 3;
+        dbg!(buckets_length_cl);
+
         let buckets_buffer = program.create_buffer_from_slice(&vec![
             0u8;
             context.num_groups as usize
@@ -53,8 +61,7 @@ pub fn handle_opencl_request(
                 * 3
         ])?;
         // let activated_bases = program.create_buffer_from_slice(&vec![0u32; 128])?;
-        
-        
+
         let result_buffer = program.create_buffer_from_slice(&vec![
             0u8;
             LIMB_COUNT as usize
@@ -88,6 +95,13 @@ pub fn handle_opencl_request(
             .arg(&(window_lengths.len() as u32))
             .run()?;
         dbg!("kernel_1");
+
+        let mut buckets_results = vec![0u8; buckets_length_cl];
+        program.read_into_buffer(&buckets_buffer, &mut buckets_results)?;
+        use std::io::Write;
+        let mut file = std::fs::File::create("../opencl.txt").unwrap();
+        writeln!(file, "{:?}", buckets_results).expect("opencl txt write error");
+
         //////////////////////////////////////////////////////////////////////////////////////////////////
         let kernel_2 =
             program.create_kernel(&context.row_func_name, 1, context.num_groups as usize)?;

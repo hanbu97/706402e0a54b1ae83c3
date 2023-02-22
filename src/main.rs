@@ -1,4 +1,8 @@
-use snarkvm::{create_scalar_bases, prelude::{TestRng, ToBytes}, Fr, G1Affine};
+use snarkvm::{
+    create_scalar_bases,
+    prelude::{TestRng, ToBytes},
+    Fr, G1Affine,
+};
 
 pub use snarkvm;
 pub mod cuda;
@@ -6,21 +10,21 @@ pub mod opencl;
 
 pub fn main() {
     let mut rng = TestRng::default();
-    let test_size = 10000;
+    let test_size = 10;
     let (bases, scalars) = create_scalar_bases::<G1Affine, Fr>(&mut rng, test_size);
 
     // let t = bases.to_bytes_le();
 
     // let cpu = snarkvm::cpu::msm(bases.as_slice(), scalars.as_slice());
-    let cuda = snarkvm::cuda::msm_cuda(bases.as_slice(), scalars.as_slice()).unwrap();
+    // let cuda = snarkvm::cuda::msm_cuda(bases.as_slice(), scalars.as_slice()).unwrap();
     let inner_cuda = cuda::msm_cuda(bases.as_slice(), scalars.as_slice()).unwrap();
 
     // assert_eq!(cpu, inner_cuda);
-    assert_eq!(cuda, inner_cuda);
+    // assert_eq!(cuda, inner_cuda);
 
-    // let opencl = opencl::msm_opencl(bases.as_slice(), scalars.as_slice()).unwrap();
+    let opencl = opencl::msm_opencl(bases.as_slice(), scalars.as_slice()).unwrap();
 
-    // assert_eq!(cpu, opencl);
+    assert_eq!(inner_cuda, opencl);
     // assert_eq!(cpu, opencl);
 }
 

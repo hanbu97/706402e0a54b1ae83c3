@@ -54,6 +54,13 @@ pub fn handle_cuda_request(
         let base_buffer = program.create_buffer_from_slice(&mapped_bases)?;
         let scalars_buffer = program.create_buffer_from_slice(&request.scalars)?;
 
+        let buckets_length = context.num_groups as usize
+            * window_lengths.len() as usize
+            * 8
+            * LIMB_COUNT as usize
+            * 3;
+        dbg!(buckets_length);
+
         let buckets_buffer = program.create_buffer_from_slice(&vec![
             0u8;
             context.num_groups as usize
@@ -91,6 +98,12 @@ pub fn handle_cuda_request(
             .arg(&window_lengths_buffer)
             .arg(&(window_lengths.len() as u32))
             .run()?;
+
+        let mut buckets_results = vec![0u8; buckets_length];
+        program.read_into_buffer(&buckets_buffer, &mut buckets_results)?;
+        use std::io::Write;
+        let mut file = std::fs::File::create("../cuda.txt").unwrap();
+        writeln!(file, "{:?}", buckets_results).expect("cuda txt write error");
 
         let kernel_2 =
             program.create_kernel(&context.row_func_name, 1, context.num_groups as usize)?;
