@@ -518,7 +518,7 @@ DEVICE POINT_jacobian blst_p1_add_projective_to_projective(const POINT_jacobian 
 
   // S2 = Y2*Z1*Z1Z1
   FIELD s2 = FIELD_mul(p2.y, p1.z);
-  s1 = FIELD_mul(s2, z1z1);
+  s2 = FIELD_mul(s2, z1z1);
 
   // H = U2-U1
   FIELD h = FIELD_sub(u2,u1);
@@ -578,7 +578,7 @@ KERNEL void msm6_pixel(GLOBAL POINT_jacobian* bucket_lists, const GLOBAL POINT_a
   uint window_start = WINDOW_SIZE * blockIdxx;
   uint window_end = window_start + window_lengths[blockIdxx];
 
-  LOCAL uint activated_bases[128];
+  uint activated_bases[128];
   uint activated_base_index = 0;
 
   uint i;
