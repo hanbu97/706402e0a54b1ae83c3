@@ -7,6 +7,7 @@ use snarkvm::{
 
 pub use snarkvm;
 pub mod cuda;
+pub mod fft;
 pub mod opencl;
 
 fn main() {}
