@@ -14,7 +14,9 @@ rand_xorshift = "0.3.0"
 rayon = "1.6.1"
 rust-gpu-tools = "0.6.1"
 # snarkvm = "0.9.13"
-snarkvm = { git = "https://github.com/Lagrange-Studio/snarkVM.git", rev = "17c00f656e76" }
+snarkvm = { git = "https://github.com/Lagrange-Studio/snarkVM.git", rev = "17c00f656e76", features = [
+    "algorithms",
+] }
 
 # [dependencies.rust-gpu-tools]
 # version = "0.6.0"
