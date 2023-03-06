@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 // use super::{OpenclContext, OpenclRequest, BIT_WIDTH, LIMB_COUNT, WINDOW_SIZE};
 use rayon::iter::ParallelIterator;
 use rayon::prelude::IntoParallelRefIterator;
@@ -17,9 +20,10 @@ struct OpenclAffine {
 
 // (a: &mut [Fr], omega: Fr, log_n: u32) {
 pub struct OpenclRequest {
-    input: Vec<Fr>,
-    omega: Fr,
-    log_n: u32,
+    pub input: Arc<RwLock<Vec<Fr>>>,
+    pub omega: Fr,
+    pub log_n: u32,
+    pub response: crossbeam_channel::Sender<Result<(), GPUError>>,
 }
 
 const MAX_LOG2_RADIX: u32 = 8; // Radix256
@@ -28,16 +32,17 @@ const LOG2_MAX_ELEMENTS: usize = 32; // At most 2^32 elements is supported.
 const MAX_LOG2_LOCAL_WORK_SIZE: u32 = 7; // 128
 
 pub struct OpenclContext {
-    fft_func_name: String,
-    program: Program,
+    pub fft_func_name: String,
+    pub program: Program,
 }
 
 // Run the OPENCL MSM operation for a given request.
 pub fn handle_opencl_request(
     context: &mut OpenclContext,
     request: &mut OpenclRequest,
-) -> Result<Vec<Fr>, GPUError> {
+) -> Result<(), GPUError> {
     // let mut input = request.input;
+    let input = &mut request.input.write();
     let log_n = request.log_n;
     let omega = &request.omega;
 
@@ -104,7 +109,7 @@ pub fn handle_opencl_request(
         return Ok(());
     });
 
-    context.program.run(closures, &mut request.input)?;
+    context.program.run(closures, input)?;
 
-    Ok(vec![])
+    Ok(())
 }

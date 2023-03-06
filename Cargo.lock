@@ -678,6 +678,7 @@ dependencies = [
  "crossbeam-channel",
  "dirs",
  "lazy_static",
+ "parking_lot",
  "rand",
  "rand_xorshift",
  "rayon",
