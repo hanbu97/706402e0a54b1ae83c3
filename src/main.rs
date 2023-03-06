@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use parking_lot::RwLock;
 use snarkvm::{
     algorithms::fft::EvaluationDomain,
     create_scalar_bases,
@@ -10,7 +13,37 @@ pub mod cuda;
 pub mod fft;
 pub mod opencl;
 use snarkvm::prelude::*;
+
+use crate::fft::fft_opencl;
 fn main() {}
+
+#[test]
+fn test_fft() {
+    let rng = &mut TestRng::default();
+    let log_d = 9;
+    let d = 1 << log_d;
+    let domain = EvaluationDomain::<Fr>::new(d).unwrap();
+
+    let log_n = log_d;
+    let omega = domain.group_gen;
+    let expected = (0..d).map(|_| Fr::rand(rng)).collect::<Vec<_>>();
+    ////////////////////////////////////////////////
+    // cpu part
+    let mut cpu_fft = expected.clone();
+    fft_in_place(&mut cpu_fft, omega, log_n);
+
+    ////////////////////////////////////////////////
+    // gpu part
+    let gpu_fft = expected.clone();
+    let gpu_fft = Arc::new(RwLock::new(gpu_fft));
+    // fft_in_place(&mut gpu_fft, omega, log_n);
+    fft_opencl(gpu_fft.clone(), omega, log_n).unwrap();
+    let gpu_fft = gpu_fft.write();
+    // .as_slice();
+    ////////////////////////////////////////////////
+
+    assert_eq!(&cpu_fft, gpu_fft.as_slice());
+}
 
 fn fft_in_place(a: &mut [Fr], omega: Fr, log_n: u32) {
     #[inline]
@@ -77,7 +110,7 @@ pub fn test_fft_fr() {
     let domain = EvaluationDomain::<Fr>::new(d).unwrap();
 
     ////////////////////////////////////////////////
-    // Gpu part
+    // cpu part
     let omega = domain.group_gen;
     let log_n = log_d;
     let expected = (0..d).map(|_| Fr::rand(rng)).collect::<Vec<_>>();

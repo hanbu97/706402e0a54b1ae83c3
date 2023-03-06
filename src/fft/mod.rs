@@ -53,6 +53,7 @@ fn initialize_opencl_request_handler(input: crossbeam_channel::Receiver<OpenclRe
 
 #[allow(clippy::transmute_undefined_repr)]
 pub fn fft_opencl(input: Arc<RwLock<Vec<Fr>>>, omega: Fr, log_n: u32) -> Result<(), GPUError> {
+    // pub fn fft_opencl(input: &mut [], omega: Fr, log_n: u32) -> Result<(), GPUError> {
     let (sender, receiver) = crossbeam_channel::bounded(1);
     OPENCL_DISPATCH
         .send(OpenclRequest {
