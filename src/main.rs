@@ -9,22 +9,90 @@ pub use snarkvm;
 pub mod cuda;
 pub mod fft;
 pub mod opencl;
-
+use snarkvm::prelude::*;
 fn main() {}
 
+fn fft_in_place(a: &mut [Fr], omega: Fr, log_n: u32) {
+    #[inline]
+    pub(crate) fn bitreverse(mut n: u32, l: u32) -> u32 {
+        let mut r = 0;
+        for _ in 0..l {
+            r = (r << 1) | (n & 1);
+            n >>= 1;
+        }
+        r
+    }
+    // use core::convert::TryFrom;
+    let n =
+        u32::try_from(a.len()).expect("cannot perform FFTs larger on vectors of len > (1 << 32)");
+    assert_eq!(n, 1 << log_n);
+
+    // swap coefficients in place
+    for k in 0..n {
+        let rk = bitreverse(k, log_n);
+        if k < rk {
+            a.swap(rk as usize, k as usize);
+        }
+    }
+
+    let mut m = 1;
+    for _i in 1..=log_n {
+        // w_m is 2^i-th root of unity
+        let w_m = omega.pow([(n / (2 * m)) as u64]);
+
+        let mut k = 0;
+        while k < n {
+            // w = w_m^j at the start of every loop iteration
+            let mut w = Fr::one();
+            for j in 0..m {
+                let mut t = a[(k + j + m) as usize];
+                t *= w;
+                let mut tmp = a[(k + j) as usize];
+                tmp -= t;
+                a[(k + j + m) as usize] = tmp;
+                a[(k + j) as usize] += t;
+                w *= &w_m;
+            }
+
+            k += 2 * m;
+        }
+
+        m *= 2;
+    }
+}
+
+fn ifft_in_place(a: &mut [Fr], omega: Fr, log_n: u32) {
+    fft_in_place(a, omega.inverse().unwrap(), log_n);
+    let domain_size_inv = Fr::from(a.len() as u64).inverse().unwrap();
+    for coeff in a.iter_mut() {
+        *coeff *= domain_size_inv;
+    }
+}
+
 #[test]
-pub fn test_fft_g1_projective() {
+pub fn test_fft_fr() {
     let rng = &mut TestRng::default();
     let log_d = 9;
     let d = 1 << log_d;
     let domain = EvaluationDomain::<Fr>::new(d).unwrap();
 
+    ////////////////////////////////////////////////
+    // Gpu part
+    let omega = domain.group_gen;
+    let log_n = log_d;
+    let expected = (0..d).map(|_| Fr::rand(rng)).collect::<Vec<_>>();
+
+    let mut cpu_fft = expected.clone();
+    fft_in_place(&mut cpu_fft, omega, log_n);
+
+    ////////////////////////////////////////////////
+
     let mut v = vec![];
     for _ in 0..d {
-        v.push(G1Projective::rand(rng));
+        v.push(Fr::rand(rng));
     }
     // Fill up with zeros.
-    v.resize(domain.size(), G1Projective::zero());
+    v.resize(domain.size(), Fr::zero());
     let mut v2 = v.clone();
 
     domain.ifft_in_place(&mut v2);
@@ -45,7 +113,7 @@ pub fn test_fft_g1_projective() {
 }
 
 #[test]
-pub fn test_fft_fr() {
+pub fn test_fft_g1_projective() {
     let rng = &mut TestRng::default();
     let log_d = 9;
     let d = 1 << log_d;
@@ -53,10 +121,10 @@ pub fn test_fft_fr() {
 
     let mut v = vec![];
     for _ in 0..d {
-        v.push(Fr::rand(rng));
+        v.push(G1Projective::rand(rng));
     }
     // Fill up with zeros.
-    v.resize(domain.size(), Fr::zero());
+    v.resize(domain.size(), G1Projective::zero());
     let mut v2 = v.clone();
 
     domain.ifft_in_place(&mut v2);

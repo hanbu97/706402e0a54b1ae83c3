@@ -62,26 +62,7 @@ CONSTANT FIELD FIELD_ONE = { { 8589934590, 6378425256633387010, 1106430627643000
 CONSTANT FIELD FIELD_P = { { 18446744069414584321, 6034159408538082302, 3691218898639771653, 8353516859464449352 } };
 CONSTANT FIELD FIELD_R2 = { { 14526898881837571181, 3129137299524312099, 419701826671360399, 524908885293268753 } };
 CONSTANT FIELD FIELD_ZERO = { { 0, 0, 0, 0 } };
-
-DEVICE FIELD FIELD_sub_nvidia(FIELD a, FIELD b) {
-asm("sub.cc.u64 %0, %0, %4;\r\n"
-"subc.cc.u64 %1, %1, %5;\r\n"
-"subc.cc.u64 %2, %2, %6;\r\n"
-"subc.u64 %3, %3, %7;\r\n"
-:"+l"(a.val[0]), "+l"(a.val[1]), "+l"(a.val[2]), "+l"(a.val[3])
-:"l"(b.val[0]), "l"(b.val[1]), "l"(b.val[2]), "l"(b.val[3]));
-return a;
-}
-DEVICE FIELD FIELD_add_nvidia(FIELD a, FIELD b) {
-asm("add.cc.u64 %0, %0, %4;\r\n"
-"addc.cc.u64 %1, %1, %5;\r\n"
-"addc.cc.u64 %2, %2, %6;\r\n"
-"addc.u64 %3, %3, %7;\r\n"
-:"+l"(a.val[0]), "+l"(a.val[1]), "+l"(a.val[2]), "+l"(a.val[3])
-:"l"(b.val[0]), "l"(b.val[1]), "l"(b.val[2]), "l"(b.val[3]));
-return a;
-}
-#endif
+ 
 
 // FinalityLabs - 2019
 // Arbitrary size prime-field arithmetic library (add, sub, mul, pow)
@@ -254,6 +235,14 @@ DEVICE uint FIELD_get_bits(FIELD l, uint skip, uint window) {
   return ret;
 }
 
+/// Multiplies all of the elements by `field`
+KERNEL void FIELD_mul_by_field(GLOBAL FIELD* elements,
+                        uint n,
+                        FIELD field) {
+  const uint gid = GET_GLOBAL_ID();
+  elements[gid] = FIELD_mul(elements[gid], field);
+}
+
 /*
  * FFT algorithm is inspired from: http://www.bealto.com/gpu-fft_group-1.html
  */
@@ -316,16 +305,6 @@ KERNEL void FIELD_radix_fft(GLOBAL FIELD* x, // Source buffer
     y[(i+counth)*p] = u[bitreverse(i + counth, deg)];
   }
 }
-
-/// Multiplies all of the elements by `field`
-KERNEL void FIELD_mul_by_field(GLOBAL FIELD* elements,
-                        uint n,
-                        FIELD field) {
-  const uint gid = GET_GLOBAL_ID();
-  elements[gid] = FIELD_mul(elements[gid], field);
-}
-
-
 
 
 
